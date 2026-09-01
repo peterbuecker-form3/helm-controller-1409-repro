@@ -41,7 +41,6 @@ flux: guard-context $(if $(strip $(CA_BUNDLE_PATH)),preload)
 	flux install --version=$(FLUX_VERSION) \
 		--components=source-controller,helm-controller \
 		--log-level=debug
-	kubectl wait --for=condition=available --timeout=180s -n flux-system --all deploy
 
 .PHONY: preload
 preload:

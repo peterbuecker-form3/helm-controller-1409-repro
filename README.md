@@ -2,9 +2,19 @@
 
 See [fluxcd/helm-controller#1409](https://github.com/fluxcd/helm-controller/issues/1409) for a detailed description of the issue being reproduced here.
 
+## Requirements
+
+The following tools must be available to run the reproduction case:
+
+- make
+- [Go](https://go.dev/)
+- [kind](https://kind.sigs.k8s.io/)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Flux](https://fluxcd.io/flux/installation/) (`flux` CLI)
+
 ## Description
 
-The reproduction case may be run against a kind cluster via:
+The reproduction case may be run via:
 
 ```sh
 make repro
@@ -14,18 +24,30 @@ This will:
 
 - create a kind cluster
 - install Flux
-- make the podinfo chart available
 - run the reproduction case
 
-## Reproducing the issue
+Key parameters that can be tuned are:
 
-Run `make repro` to start from scratch, or `make test` to re-run the reproduction on an existing kind cluster. The reproduction will be attempted up to 10 times, and will log `issue was reproduced` in case of success.
+- `HELM_RELEASE_COUNT`: the number of `HelmRelease` objects to deploy concurrently (default: 1)
+- `PATCH_STORM_WORKERS`: the number of concurrent patch-storm workers to use (default: 8)
 
-The reproduction case tries to force a race condition inside `helm-controller` where a helm release is fully installed, but the status conditions on the `HelmRelease` object are not updated to reflect the successful installation.
+For example:
 
-This is achieved by continuously updating annotations on target `HelmRelease` object(s) to continuously increase `metadata.resourceVersion`, which in turns increases the likelihood of `helm-controller` hitting conflicts while attempting to update the status conditions.
+```sh
+make repro HELM_RELEASE_COUNT=2 PATCH_STORM_WORKERS=4
+```
 
-By default, `make test` will deploy a single `HelmRelease` object and patch it with 8 concurrent patch-storm workers. Please see the `Makefile` for more details.
+To just run the test case against an already created kind cluster, run:
+
+```sh
+make test
+```
+
+## The reproduction case
+
+The reproduction case tries to force a race condition inside `helm-controller` where a helm release is fully installed from a Helm point of view, but the status conditions on the `HelmRelease` object are not updated to reflect that.
+
+This is achieved by continuously updating annotations on the target `HelmRelease` objects to cause the informer cache in `helm-controller` to fall behind, which will cause `helm-controller` to fail patching the status conditions due to conflicts.
 
 ## Cleanup
 

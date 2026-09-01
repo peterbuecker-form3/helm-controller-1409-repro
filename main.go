@@ -107,11 +107,15 @@ func main() {
 		}
 		wg.Wait()
 
+		reproduced := false
 		for i := range hrs {
 			hrs[i].report()
 			if hrs[i].isStuck() {
-				os.Exit(0)
+				reproduced = true
 			}
+		}
+		if reproduced {
+			os.Exit(0)
 		}
 	}
 
@@ -282,34 +286,15 @@ func (r *repro) delete(ctx context.Context) {
 
 func (r *repro) report() {
 	if r.isStuck() {
-		r.log.Info("issue was reproduced")
-	} else {
-		r.log.Info("issue was not reproduced")
-	}
-
-	if r.obj == nil {
-		return
-	}
-	if len(r.obj.Status.Conditions) == 0 {
-		r.log.Info("condition", "helmrelease", r.name, "type", "<none>")
-	}
-	for _, c := range r.obj.Status.Conditions {
-		r.log.Info("condition", "helmrelease", r.name,
-			"type", c.Type, "status", c.Status,
-			"reason", c.Reason, "message", c.Message)
-	}
-	if len(r.obj.Status.History) == 0 {
-		r.log.Info("history", "helmrelease", r.name, "version", "<none>")
-		return
-	}
-	for _, h := range r.obj.Status.History {
-		if h == nil {
-			continue
+		ready, _ := condition(r.obj.Status.Conditions, meta.ReadyCondition)
+		historyStatus := "<none>"
+		if latest := r.obj.Status.History.Latest(); latest != nil {
+			historyStatus = latest.Status
 		}
-		r.log.Info("history", "helmrelease", r.name, "version", h.Version,
-			"status", h.Status, "action", h.Action,
-			"chart", h.VersionedChartName())
+		r.log.Info("issue was reproduced", "helmrelease", r.name, "ready", ready, "history", historyStatus)
+		return
 	}
+	r.log.Info("issue was not reproduced", "helmrelease", r.name)
 }
 
 func (r *repro) isStuck() bool {
